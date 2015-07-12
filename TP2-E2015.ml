@@ -248,8 +248,24 @@ module Tp2e15 : TP2E15 = struct
 
        (* Méthodes à implanter *)
       
-      (* sauvegarder_liste_evenements : evenement list -> out_channel -> unit *)     
+      (* sauvegarder_liste_evenements : evenement list -> out_channel -> unit *)      
       method sauvegarder_liste_evenements (le:evenement list) (flux:out_channel) =
+	let afficheEv e = 
+	  output_string flux ("Titre: " ^ e#get_titre_evenement ^ ".\n");
+          output_string flux ("Categorie: " ^e#get_categorie_evenement ^ ".\n");
+	  output_string flux ("Lieu: " ^ e#get_nomlieu_evenement ^ ".\n");       
+          output_string flux ("Arrondissements: " ^ e#get_nom_arrondissement ^ ".\n");
+	  output_string flux ("Telephone: " ^ e#get_tel1_evenement ^ ".\n");
+	  output_string flux ("Dates: " ^ e#get_debut_evenement ^ " au " ^ e#get_fin_evenement ^ ".\n");
+	  output_string flux ("Horaire: " ^ e#get_horaire_evenement ^ ".\n");
+	     let c = int_of_string e#get_cout_evenement in
+	     let ch = if c = 0 then "Gratuit" else if c = 1 then "Cout a l'entree" else if c = 2 then "Autre" else "Pas affiche" in
+	     output_string flux ("Cout: " ^ ch ^ ".\n\n");
+           in
+        iter afficheEv le
+	
+
+
 
       (* lancer_systeme_evenements : unit *)
       method lancer_systeme_evenements =
