@@ -250,6 +250,9 @@ module Tp2e15 : TP2E15 = struct
       
       (* sauvegarder_liste_evenements : evenement list -> out_channel -> unit *)      
       method sauvegarder_liste_evenements (le:evenement list) (flux:out_channel) =
+	match le with
+        | [] -> raise (Failure "Le systeme d'evenements est vide")
+	| _::_ ->
 	let afficheEv e = 
 	  output_string flux ("Titre: " ^ e#get_titre_evenement ^ ".\n");
           output_string flux ("Categorie: " ^e#get_categorie_evenement ^ ".\n");
@@ -264,22 +267,135 @@ module Tp2e15 : TP2E15 = struct
            in
         iter afficheEv le
 	
-
-
-
       (* lancer_systeme_evenements : unit *)
-      method lancer_systeme_evenements =
+     (* method lancer_systeme_evenements = *)
 
       (* lancer_interface_sevenements : unit *)
       method lancer_interface_sevenements =
-	     (* À compléter *)
-	     let top = openTk () in
-	     Wm.title_set top "Système d'événements";
-	     Wm.geometry_set top "370x580";
-	     let l1 = Label.create ~text:"Bienvenue a l'outil de recherche d'événements" top in
-             pack [l1];
-	     let _ = Printexc.print mainLoop () in
-	     print_endline "Merci et au revoir!"
+
+	let syseve = new syseve_quebec "les donnees ouvertes" "la ville de Quebec" in
+	syseve#charger_donnees_sysevenements "EVENEMENT.CSV" ;
+	let liste_arrondissements = syseve#lister_arrondissements in
+	let liste_categories = syseve#lister_categories_evenements in 
+        let nArrond = ref 0 in
+        let nCat = ref 0 in
+
+	(* À compléter *)
+	let top = openTk () in
+	Wm.title_set top "Système d'événements";
+	Wm.geometry_set top "370x580";
+	let l1 = Label.create ~text:"Bienvenue a l'outil de recherche d'événements" top in
+	let _ = Wm.title_set top "Listbox 1" in
+        let arrondissements = Listbox.create ~selectmode:`Single top ~height:6 in
+	let _ = Listbox.insert
+	    ~index:`End
+	    ~texts:(liste_arrondissements)
+	    arrondissements in
+	let categories = Listbox.create ~selectmode:`Single top in
+	let _ = Listbox.insert
+	     ~index:`End
+	    ~texts:(liste_categories)
+	    categories in
+
+	let textArrond = Textvariable.create () in
+	Textvariable.set textArrond " Arrondissement selectionné :";
+	let a = Label.create ~textvariable:textArrond top in
+	
+	let textCateg = Textvariable.create () in
+	Textvariable.set textCateg " Categorie selectionnée :";
+	let c = Label.create ~textvariable:textCateg top in
+
+	let v = Textvariable.create () in
+        Textvariable.set v " ? " ;
+	let l = Label.create ~textvariable:v 
+	    ~background:(`Color "#FDF1B8")
+	    ~foreground:(`Color "#0F056B")
+	    top in
+
+	let v2 = Textvariable.create() in
+	Textvariable.set v2 " ? ";
+	let k = Label.create ~textvariable:v2
+	    ~background:(`Color "#FDF1B8")
+	    ~foreground:(`Color "#0F056B")
+	    top in
+
+	let b = Button.create ~text:"Afficher l'arrondissement"
+	    ~command:(fun () ->
+	      try 
+		 nArrond := ( match (List.hd (Listbox.curselection arrondissements)) with
+		| `Num y -> y 
+		| _ -> failwith "pas de sélection" );
+	        Textvariable.set v (nth liste_arrondissements !nArrond)
+		with _ -> (print_endline "pas de sélection"; flush stdout)
+	       )
+	    top in
+
+	let b2 = Button.create ~text:"Afficher la catégorie"
+	    ~command:(fun () ->
+	      try 
+		nCat := (match (List.hd (Listbox.curselection categories)) with
+		| `Num y -> y 
+		| _ -> failwith "pas de sélection");
+	      	Textvariable.set v2 (List.nth liste_categories !nCat)
+		with _ -> (print_endline "pas de sélection"; flush stdout)
+			      )                                                                                              top in
+
+	let makeWindowResults () =
+
+	  let d = Toplevel.create top in
+	  begin
+	    Wm.title_set d "Résultats de la recherche";
+	    Wm.geometry_set d "580x600";
+	    let txt = Text.create ~height:58
+		d in
+	    let listeSelonArrond = (syseve#trouver_selon_arrondissement (nth liste_arrondissements !nArrond))  in
+	    let listeFiltre = filter (fun e -> e#get_categorie_evenement = (nth liste_categories !nCat)) listeSelonArrond in 
+
+	    let f = open_out "~results.txt" in
+	    self#sauvegarder_liste_evenements listeFiltre f;
+	    close_out f;
+	    let r = open_in "~results.txt" in
+
+	    let rec lire (flux:in_channel) =
+	    let read_line ic =
+	    try
+	       input_line ic 
+	    with End_of_file -> "EOF" 
+	    in
+	    let ligne = read_line flux in
+	    match ligne with
+	    | "" -> "\n" ^ lire flux
+	    | "EOF" -> ""
+	    | s ->  s ^ "\n" ^ (lire flux) in
+
+	    let results = lire r in
+	    let nbTrouves = "Nombre d'évènements trouvés :" ^ (string_of_int (List.length listeFiltre)) ^"\n\n" in
+
+	    Text.insert (`End,[]) nbTrouves txt;
+	    Text.insert (`End,[]) results txt;
+	    close_in r;
+	    pack [txt] ~expand:true;
+
+	  end in
+
+	let b3 = Button.create ~text:"Afficher les résultats"
+	    ~command:(fun () ->  makeWindowResults () )
+	    top in
+
+	pack [l1];
+	pack [arrondissements] ~fill:`X ~expand:false;           
+	pack [categories] ~fill:`X ~ipady:80;  
+	pack [a];
+	pack [l];
+	pack [c];
+ 	pack [k]; 
+        pack [b] ~side:`Left;
+	pack [b2] ~side:`Left;
+	pack [b3] ~side:`Left;
+	
+	let _ = Printexc.print mainLoop () in
+	print_endline "Merci et au revoir!";;
+
 
       initializer if interface then self#lancer_interface_sevenements else self#lancer_systeme_evenements
 
